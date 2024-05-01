@@ -1,4 +1,4 @@
-package cc.gifthub.aex.config;
+package cc.gifthub.image.config;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;

@@ -50,6 +50,8 @@ public class ImageServiceImpl implements ImageService{
         }
         String s3Url = this.uploadImage(image);
 
+        log.info("~~~~~~~~~~~~~~~~~~~~~~~~~");
+
         Optional<UserEntity> userById = userRepository.findById(imageUploadDto.getUser_id());
         UserEntity userEntity = userById.get();
 
@@ -58,7 +60,7 @@ public class ImageServiceImpl implements ImageService{
 
         Optional<RoomEntity> roomById = roomRepository.findById(imageUploadDto.getRoom_id());
         RoomEntity roomEntity = roomById.get();
-
+        log.info("{}, {}, {}", userEntity.getId(), categoryEntity.getId(), roomEntity.getId());
         ImageEntity imageEntity = ImageEntity.builder()
                 .url(s3Url)
                 .expire(LocalDateTime.now()) // change

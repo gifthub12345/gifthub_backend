@@ -17,15 +17,20 @@ public class UserEntity {
     @Column(name = "user_id")
     private Long id;
 
-    private String username;
-    private String password;
+    private String identifier;
+    private String name;
     private String email;
 
     @Builder
-    public UserEntity(Long id, String username, String password, String email) {
+    public UserEntity(Long id, String identifier, String name, String email) {
         this.id = id;
-        this.username = username;
-        this.password = password;
+        this.identifier = identifier;
+        this.name = name;
         this.email = email;
+    }
+
+    public void updateNameAndEmail(String newName, String newEmail) {
+        this.name = newName;
+        this.email = newEmail;
     }
 }

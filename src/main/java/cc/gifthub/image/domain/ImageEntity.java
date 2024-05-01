@@ -35,7 +35,6 @@ public class ImageEntity {
     @JoinColumn(name = "user_id")
     private UserEntity user;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id")
     private RoomEntity room;
