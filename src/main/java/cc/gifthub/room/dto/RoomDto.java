@@ -10,12 +10,13 @@ import lombok.*;
 @AllArgsConstructor
 public class RoomDto {
     private Long id;
-    private String title;
-    private String code;
+    private String name;
+    //private UserDto user;
     public static RoomDto from(RoomEntity room) {
         return RoomDto.builder()
                 .id(room.getId())
-                .code(room.getCode())
+                //.user(UserDto.from(room.getUserEntity()))
+                .name(room.getName())
                 .build();
     }
 }

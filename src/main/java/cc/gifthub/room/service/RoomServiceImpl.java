@@ -17,10 +17,11 @@ public class RoomServiceImpl {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     @Transactional
-    public RoomDto createRoom(Long userId, CreateRoomForm form) {
-        //나중에 오류 발생 예외 처리 필요하면 개발
-        UserEntity user = userRepository.findById(userId).orElse(null);
-        RoomEntity room = new RoomEntity();
+    public RoomDto createRoom(CreateRoomForm form) {
+        RoomEntity room = roomRepository.save(RoomEntity.builder()
+                .id(form.getId())
+                .name(form.getName())
+                .build());
         return RoomDto.from(room);
     }
 }

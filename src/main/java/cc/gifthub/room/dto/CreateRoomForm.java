@@ -13,6 +13,5 @@ import lombok.NoArgsConstructor;
 public class CreateRoomForm {
 
     private Long id;
-    private String title;
-    private String code;
+    private String name;
 }
