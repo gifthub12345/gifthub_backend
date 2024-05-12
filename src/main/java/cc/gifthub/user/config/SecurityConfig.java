@@ -2,8 +2,8 @@ package cc.gifthub.user.config;
 
 import cc.gifthub.user.jwt.CustomSuccessHandler;
 import cc.gifthub.user.jwt.JWTFilter;
-import cc.gifthub.user.jwt.JWTUtil;
 import cc.gifthub.user.service.CustomOAuth2UserService;
+import cc.gifthub.user.jwt.JWTUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -41,13 +42,18 @@ public class SecurityConfig {
                 );
         http
                 .authorizeHttpRequests((auth)->auth
-                        .requestMatchers("/**").permitAll()
+                        .requestMatchers("/login").permitAll()
                         .anyRequest().authenticated()
                 );
         http
                 .sessionManagement((session)->session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         return http.build();
+    }
+
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }
 

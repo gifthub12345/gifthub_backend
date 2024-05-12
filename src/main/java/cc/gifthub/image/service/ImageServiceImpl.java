@@ -3,6 +3,7 @@ package cc.gifthub.image.service;
 import cc.gifthub.category.domain.CategoryEntity;
 import cc.gifthub.category.repository.CategoryRepository;
 import cc.gifthub.image.domain.ImageEntity;
+import cc.gifthub.image.dto.ImageS3GetDto;
 import cc.gifthub.image.dto.ImageUploadDto;
 import cc.gifthub.image.repository.ImageRepository;
 import cc.gifthub.room.domain.RoomEntity;
@@ -15,31 +16,34 @@ import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.util.IOUtils;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.time.LocalDateTime;
 import java.util.*;
 
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ImageServiceImpl implements ImageService{
     private final AmazonS3Client amazonS3Client;
     private final ImageRepository ImageRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
     private final CategoryRepository categoryRepository;
-
+    private final ImageRepository imageRepository;
+    private final BCryptPasswordEncoder bCryptPasswordEncoder;
     @Value("${cloud.aws.bucket-name}")
     private String bucket;
 
@@ -48,9 +52,8 @@ public class ImageServiceImpl implements ImageService{
         if(image.isEmpty() || Objects.isNull(image.getOriginalFilename())){
             throw new IOException("비어있는 파일");
         }
-        String s3Url = this.uploadImage(image);
 
-        log.info("~~~~~~~~~~~~~~~~~~~~~~~~~");
+        String s3Url = this.uploadImage(image);
 
         Optional<UserEntity> userById = userRepository.findById(imageUploadDto.getUser_id());
         UserEntity userEntity = userById.get();
@@ -60,18 +63,25 @@ public class ImageServiceImpl implements ImageService{
 
         Optional<RoomEntity> roomById = roomRepository.findById(imageUploadDto.getRoom_id());
         RoomEntity roomEntity = roomById.get();
+
+        List<ImageEntity> listByRoomIdAndCategoryId = imageRepository.findByRoomIdAndCategoryId(roomEntity.getId(), categoryEntity.getId());
+        for(ImageEntity imageEntity : listByRoomIdAndCategoryId){
+            if(bCryptPasswordEncoder.matches(imageUploadDto.getBarcode(), imageEntity.getBarcode())){
+                throw new IOException("이미 존재하는 바코드");
+            }
+        }
+
         log.info("{}, {}, {}", userEntity.getId(), categoryEntity.getId(), roomEntity.getId());
         ImageEntity imageEntity = ImageEntity.builder()
                 .url(s3Url)
-                .expire(LocalDateTime.now()) // change
-                .barcode("barcode_change") // change
+                .expire(imageUploadDto.getExpire())
+                .barcode(bCryptPasswordEncoder.encode(imageUploadDto.getBarcode()))
                 .category(categoryEntity)
                 .user(userEntity)
                 .room(roomEntity)
                 .build();
 
         ImageRepository.save(imageEntity);
-
 
         return s3Url;
     }
@@ -124,22 +134,69 @@ public class ImageServiceImpl implements ImageService{
             throw new IOException("확장자 오류 - 해당 확장자는 이미지가 아님");
         }
     }
-
     @Override
-    public void deleteImageFromS3(String imageAddress) throws IOException {
-        String key = getKeyFromImageAddress(imageAddress);
-        amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, key));
-
-        ImageRepository.delete(ImageRepository.findByUrl(imageAddress));
+    public void deleteImageFromS3(Long gifticon_id) throws IOException {
+        String key = getKeyFromGifitconId(gifticon_id);
+        if (key != null && !key.isEmpty()) {
+            amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, key));
+            ImageRepository.deleteById(Math.toIntExact(gifticon_id));
+        } else {
+            throw new IllegalArgumentException("Object key is null or empty");
+        }
     }
 
-    private String getKeyFromImageAddress(String imageAddress) throws IOException {
-        try{
-            URL url = new URL(imageAddress);
-            String decodingKey = URLDecoder.decode(url.getPath(), "UTF-8");
-            return decodingKey.substring(1);
-        }catch(IOException e){
-            throw new IOException("s3주소 디코딩 실패");
+    private String getKeyFromGifitconId(Long gifticon_id) throws UnsupportedEncodingException, IOException  {
+        try {
+            Optional<ImageEntity> findImage = imageRepository.findById(Math.toIntExact(gifticon_id));
+            if (findImage.isPresent()) {
+                ImageEntity imageEntity = findImage.get();
+                String decodingKey = URLDecoder.decode(imageEntity.getUrl(), "UTF-8");
+                // URL에서 마지막 '/' 다음의 문자열부터 추출
+                int lastSlashIndex = decodingKey.lastIndexOf('/');
+                if (lastSlashIndex != -1 && lastSlashIndex < decodingKey.length() - 1) {
+                    return decodingKey.substring(lastSlashIndex + 1);
+                } else {
+                    throw new UnsupportedEncodingException("올바른 URL 형식이 아닙니다.");
+                }
+            } else {
+                throw new UnsupportedEncodingException("이미지를 찾을 수 없습니다.");
+            }
+        } catch (IOException  e) {
+            throw new IOException ("S3 주소 디코딩 실패");
         }
+
+    }
+
+
+
+    @Override
+    public List<ImageS3GetDto> getImagesFromS3(Long room_id, Long category_id) {
+        List<ImageEntity> byRoomIdAndCategoryId = imageRepository.findByRoomIdAndCategoryId(room_id, category_id);
+        if(byRoomIdAndCategoryId != null ){
+            List<ImageS3GetDto> allImagesFromS3 = getAllImagesFromS3(byRoomIdAndCategoryId);
+            return allImagesFromS3;
+
+        }
+        return null;
+    }
+
+
+    public List<ImageS3GetDto> getAllImagesFromS3(List<ImageEntity> s3List) {
+        List<ImageS3GetDto> imageS3GetDtoList = new ArrayList<>();
+        for(ImageEntity imageEntity: s3List){
+            ImageS3GetDto imageS3GetDto = ImageS3GetDto.builder().url(imageEntity.getUrl()).build();
+            imageS3GetDtoList.add(imageS3GetDto);
+        }
+        return imageS3GetDtoList;
+    }
+
+    @Override
+    public ImageS3GetDto getOneImageFromS3(Long gifticon_id) {
+        Optional<ImageEntity> getImage = imageRepository.findById(Math.toIntExact(gifticon_id));
+        if(getImage.isPresent()){
+            ImageEntity imageEntity = getImage.get();
+            return ImageS3GetDto.builder().url(imageEntity.getUrl()).build();
+        }
+        return null;
     }
 }
