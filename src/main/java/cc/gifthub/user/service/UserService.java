@@ -8,7 +8,6 @@ import org.springframework.security.core.context.SecurityContext;
 import java.util.List;
 
 public interface UserService {
-    UserOAuthDto getCustomOAuth2User(SecurityContext securityContext);
     Long getCurrentUserId(SecurityContext securityContext);
 
     List<UserInfoBriefDto> getUserinfoList(Long room_id);

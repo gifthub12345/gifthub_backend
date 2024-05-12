@@ -1,6 +1,7 @@
 package cc.gifthub.user.service;
 
 import cc.gifthub.room.domain.RoomEntity;
+import cc.gifthub.room.exceotion.RoomNotFoundException;
 import cc.gifthub.user.dto.UserInfoBriefDto;
 import cc.gifthub.user.dto.UserInfoDto;
 import cc.gifthub.room.repository.RoomRepository;
@@ -27,17 +28,6 @@ import java.util.Optional;
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
-
-    @Override
-    public UserOAuthDto getCustomOAuth2User(SecurityContext securityContext) {
-        Authentication authentication = securityContext.getAuthentication();
-        CustomOAuth2User customOAuth2User = authentication.getPrincipal() instanceof CustomOAuth2User ? (CustomOAuth2User) authentication.getPrincipal() : null;
-        if (customOAuth2User != null) {
-            UserEntity userEntity = userRepository.findByIdentifier(customOAuth2User.getIdentifier());
-            return UserOAuthDto.toUserOAuthDto(userEntity);
-        }
-        return null;
-    }
 
     @Override
     public Long getCurrentUserId(SecurityContext securityContext) {
@@ -68,8 +58,9 @@ public class UserServiceImpl implements UserService {
                 userInfoBriefDtoList.add(userInfoBriefDto);
             }
             return userInfoBriefDtoList;
+        }else{
+            throw new RoomNotFoundException();
         }
-        return null;
     }
 
     @Override

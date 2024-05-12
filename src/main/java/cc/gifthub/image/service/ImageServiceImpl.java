@@ -5,13 +5,13 @@ import cc.gifthub.category.repository.CategoryRepository;
 import cc.gifthub.image.domain.ImageEntity;
 import cc.gifthub.image.dto.ImageS3GetDto;
 import cc.gifthub.image.dto.ImageUploadDto;
+import cc.gifthub.image.exception.*;
 import cc.gifthub.image.repository.ImageRepository;
 import cc.gifthub.room.domain.RoomEntity;
 import cc.gifthub.room.repository.RoomRepository;
 import cc.gifthub.user.domain.UserEntity;
 import cc.gifthub.user.repository.UserRepository;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
@@ -50,28 +50,26 @@ public class ImageServiceImpl implements ImageService{
     @Override
     public String upload(MultipartFile image, ImageUploadDto imageUploadDto) throws IOException {
         if(image.isEmpty() || Objects.isNull(image.getOriginalFilename())){
-            throw new IOException("비어있는 파일");
+            throw new ImageEmptyException();
         }
 
         String s3Url = this.uploadImage(image);
 
         Optional<UserEntity> userById = userRepository.findById(imageUploadDto.getUser_id());
-        UserEntity userEntity = userById.get();
-
         Optional<CategoryEntity> categoryById = categoryRepository.findById(imageUploadDto.getCategory_id());
-        CategoryEntity categoryEntity = categoryById.get();
-
         Optional<RoomEntity> roomById = roomRepository.findById(imageUploadDto.getRoom_id());
+
+        UserEntity userEntity = userById.get();
+        CategoryEntity categoryEntity = categoryById.get();
         RoomEntity roomEntity = roomById.get();
 
         List<ImageEntity> listByRoomIdAndCategoryId = imageRepository.findByRoomIdAndCategoryId(roomEntity.getId(), categoryEntity.getId());
         for(ImageEntity imageEntity : listByRoomIdAndCategoryId){
             if(bCryptPasswordEncoder.matches(imageUploadDto.getBarcode(), imageEntity.getBarcode())){
-                throw new IOException("이미 존재하는 바코드");
+                throw new ImageAlreadyExistException();
             }
         }
 
-        log.info("{}, {}, {}", userEntity.getId(), categoryEntity.getId(), roomEntity.getId());
         ImageEntity imageEntity = ImageEntity.builder()
                 .url(s3Url)
                 .expire(imageUploadDto.getExpire())
@@ -86,12 +84,12 @@ public class ImageServiceImpl implements ImageService{
         return s3Url;
     }
 
-    private String uploadImage(MultipartFile image) throws IOException {
+    private String uploadImage(MultipartFile image)  {
         this.validateImageExtension(image.getOriginalFilename());
         try{
             return this.uploadImageToS3(image);
         }catch (IOException e){
-            throw new IOException("업로드 실패");
+            throw new S3ImageUploadException();
         }
     }
 
@@ -113,8 +111,8 @@ public class ImageServiceImpl implements ImageService{
             PutObjectRequest putObjectRequest = new PutObjectRequest(bucket, s3FileName, byteArrayInputStream, objectMetadata);
             amazonS3Client.putObject(putObjectRequest);
 
-        }catch (AmazonS3Exception e){
-            throw new IOException("s3에 등록 실패");
+        }catch (S3ImageUploadException e){
+            throw new S3ImageUploadException();
         }finally {
             byteArrayInputStream.close();
             inputStream.close();
@@ -122,47 +120,43 @@ public class ImageServiceImpl implements ImageService{
         return amazonS3Client.getUrl(bucket, s3FileName).toString();
     }
 
-    private void validateImageExtension(String fileOriginName) throws IOException {
+    private void validateImageExtension(String fileOriginName) {
         int lastDotIndex = fileOriginName.lastIndexOf(".");
         if(lastDotIndex == -1){
-            throw new IOException("파일명 오류 - 확장자 없음");
+            throw new ExtensionNotFoundException();
         }
         String extension = fileOriginName.substring(lastDotIndex + 1).toLowerCase();
         List<String> allowedExtensionList = Arrays.asList("jpg", "png", "jpeg", "gif");
 
         if(!allowedExtensionList.contains(extension)){
-            throw new IOException("확장자 오류 - 해당 확장자는 이미지가 아님");
+            throw new ExtensionUnsuitableException();
         }
     }
     @Override
     public void deleteImageFromS3(Long gifticon_id) throws IOException {
         String key = getKeyFromGifitconId(gifticon_id);
-        if (key != null && !key.isEmpty()) {
+        if (!key.isEmpty()) {
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, key));
             ImageRepository.deleteById(Math.toIntExact(gifticon_id));
         } else {
-            throw new IllegalArgumentException("Object key is null or empty");
+            throw new S3UrlException();
         }
     }
 
-    private String getKeyFromGifitconId(Long gifticon_id) throws UnsupportedEncodingException, IOException  {
-        try {
-            Optional<ImageEntity> findImage = imageRepository.findById(Math.toIntExact(gifticon_id));
-            if (findImage.isPresent()) {
-                ImageEntity imageEntity = findImage.get();
-                String decodingKey = URLDecoder.decode(imageEntity.getUrl(), "UTF-8");
-                // URL에서 마지막 '/' 다음의 문자열부터 추출
-                int lastSlashIndex = decodingKey.lastIndexOf('/');
-                if (lastSlashIndex != -1 && lastSlashIndex < decodingKey.length() - 1) {
-                    return decodingKey.substring(lastSlashIndex + 1);
-                } else {
-                    throw new UnsupportedEncodingException("올바른 URL 형식이 아닙니다.");
-                }
+    private String getKeyFromGifitconId(Long gifticon_id) throws UnsupportedEncodingException  {
+        Optional<ImageEntity> findImage = imageRepository.findById(Math.toIntExact(gifticon_id));
+        if (findImage.isPresent()) {
+            ImageEntity imageEntity = findImage.get();
+            String decodingKey = URLDecoder.decode(imageEntity.getUrl(), "UTF-8");
+            // URL에서 마지막 '/' 다음의 문자열부터 추출
+            int lastSlashIndex = decodingKey.lastIndexOf('/');
+            if (lastSlashIndex != -1 && lastSlashIndex < decodingKey.length() - 1) {
+                return decodingKey.substring(lastSlashIndex + 1);
             } else {
-                throw new UnsupportedEncodingException("이미지를 찾을 수 없습니다.");
+                throw new S3UrlException();
             }
-        } catch (IOException  e) {
-            throw new IOException ("S3 주소 디코딩 실패");
+        } else {
+            throw new S3ImageNotFoundException();
         }
 
     }

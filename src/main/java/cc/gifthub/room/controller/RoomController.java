@@ -30,9 +30,7 @@ public class RoomController {
 
         // 현재 사용자 id 찾기
         Long currentUserId = userServiceImpl.getCurrentUserId(SecurityContextHolder.getContext());
-
         roomServiceImpl.enterRoom(currentUserId, roomJoinDto);
-
         return ResponseEntity.ok().body("enterRoom success");
 
     }
