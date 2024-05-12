@@ -1,15 +1,19 @@
 package cc.gifthub.room.controller;
 
+import cc.gifthub.room.dto.ApplicantDto;
 import cc.gifthub.room.dto.CreateRoomForm;
 import cc.gifthub.room.dto.RoomDto;
+import cc.gifthub.room.service.RoomApplyServiceImpl;
 import cc.gifthub.room.service.RoomService;
 import cc.gifthub.room.service.RoomServiceImpl;
+import cc.gifthub.user.domain.UserEntity;
 import lombok.RequiredArgsConstructor;
+import org.apache.catalina.User;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -17,9 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 public class RoomManageController {
     private final RoomServiceImpl roomServiceImpl;
+    private final RoomApplyServiceImpl roomApplyServiceImpl;
 
     //나중에 ID 받아오기
-    @PostMapping
+    @PostMapping("/new")
     public ResponseEntity<RoomDto> createRoom(
             @RequestBody CreateRoomForm form
     ) {
