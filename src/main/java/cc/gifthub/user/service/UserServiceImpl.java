@@ -1,7 +1,7 @@
 package cc.gifthub.user.service;
 
 import cc.gifthub.room.domain.RoomEntity;
-import cc.gifthub.room.exceotion.RoomNotFoundException;
+import cc.gifthub.room.exception.RoomNotFoundException;
 import cc.gifthub.user.dto.UserInfoBriefDto;
 import cc.gifthub.user.dto.UserInfoDto;
 import cc.gifthub.room.repository.RoomRepository;

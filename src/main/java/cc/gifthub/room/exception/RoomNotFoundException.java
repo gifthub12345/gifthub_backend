@@ -1,4 +1,4 @@
-package cc.gifthub.room.exceotion;
+package cc.gifthub.room.exception;
 
 import cc.gifthub.common.exception.GifthubException;
 

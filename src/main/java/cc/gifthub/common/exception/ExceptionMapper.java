@@ -1,7 +1,7 @@
 package cc.gifthub.common.exception;
 
 import cc.gifthub.image.exception.*;
-import cc.gifthub.room.exceotion.RoomNotFoundException;
+import cc.gifthub.room.exception.RoomNotFoundException;
 import org.springframework.http.HttpStatus;
 
 import java.util.LinkedHashMap;
